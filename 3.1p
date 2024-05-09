@@ -1,0 +1,106 @@
+#include <EMailSender.h>
+#include <WiFiNINA.h>
+#include<Wire.h>
+#include<BH1750.h>
+
+BH1750 GY30;
+
+// Update these with your network and email details
+//email/password replaced with TEST
+char ssid[] = "test";
+char password[] = "test"; 
+char emailUser[] = "test";
+char emailPassword[] = "test"; // App-specific password
+char emailRecipient[] = "test";
+
+const String HIGH_LIGHT_TEXT = "Light level exceeded 700 lux!";
+const char HIGH_LIGHT_SUBJ[] = "High Light Level Alert";
+const String LOW_LIGHT_TEXT = "Light level dropped below 30 lux!";
+const char LOW_LIGHT_SUBJ[] = "Low Light Level Alert";
+
+WiFiClient client; // Sets up the WiFi client
+
+bool highEmailSent = false;
+bool lowEmailSent = false;
+
+void setup() {
+  Serial.begin(9600);
+  Wire.begin();
+  GY30.begin();
+  Serial.println("SAIF LX WORKSHOP");
+
+  // All we do is connect to WiFi
+  setupWifi();
+}
+
+void loop() {
+  float lux = GY30.readLightLevel();
+  Serial.println("Light = " + String(lux) + "lx");
+
+  // Check for high light level
+  if (!highEmailSent && lux > 700) {
+    sendEmail(HIGH_LIGHT_SUBJ, HIGH_LIGHT_TEXT);
+    highEmailSent = true;
+  } else if (lux <= 700) {
+    highEmailSent = false; // Reset the flag if lux drops below 700
+  }
+
+  // Check for low light level
+  if (!lowEmailSent && lux < 30) {
+    sendEmail(LOW_LIGHT_SUBJ, LOW_LIGHT_TEXT);
+    lowEmailSent = true;
+  } else if (lux >= 30) {
+    lowEmailSent = false; // Reset the flag if lux goes above 30
+  }
+
+  // Add a delay to avoid continuous email sending
+  delay(1000);
+}
+
+void setupWifi() {
+  // Connects to the WiFi
+  Serial.print("Connecting to ");
+  Serial.print(ssid);
+  Serial.print("...");
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    // Will stay in a loop if it doesn't connect
+    delay(2000);
+    Serial.print(".");
+  }
+  Serial.println("Connected");
+  Serial.print("Local IP address: ");
+  Serial.println(WiFi.localIP()); // Prints your local IP address, not needed for anything in the program
+  Serial.println("");
+}
+
+void sendEmail(const char* subject, const String& text) {
+  // Sends an email
+  char senderName[] = "SENDER"; // The name it will display who the email is from
+
+  // The actual stuff that sends the email:
+  EMailSender emailSend(emailUser, emailPassword, emailUser, senderName);
+  EMailSender::EMailMessage msg;
+  EMailSender::Response resp;
+  Serial.println("Sending email...");
+  msg.subject = subject;
+  msg.message = text;
+  resp = emailSend.send(emailRecipient, msg);
+
+  // Prints the status info
+  Serial.println("Sending status: ");
+  Serial.print(resp.status);
+  Serial.println(resp.code);
+  Serial.println(resp.desc);
+  Serial.println("");
+  Serial.print("FROM: ");
+  Serial.println(emailUser);
+  Serial.print("TO: ");
+  Serial.println(emailRecipient);
+  Serial.print("SUBJECT: ");
+  Serial.println(subject);
+  Serial.print("DATA:");
+  Serial.println(text);
+  Serial.println("");
+}
